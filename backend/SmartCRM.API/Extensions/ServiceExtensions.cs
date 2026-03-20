@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Microsoft.IdentityModel.Tokens;
 using SmartCRM.Core.Entities;
 using SmartCRM.Core.Interfaces;
@@ -18,7 +19,7 @@ public static class ServiceExtensions
         IConfiguration config)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(
+            options.UseNpgsql(
                 config.GetConnectionString("DefaultConnection"),
                 b => b.MigrationsAssembly("SmartCRM.Infrastructure")));
         return services;
