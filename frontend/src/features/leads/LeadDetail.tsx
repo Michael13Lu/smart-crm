@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, Phone, Building2, Globe, Pencil, Trash2, Loader2, TrendingUp } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Building2, Globe, Pencil, Trash2, Loader2, TrendingUp, MoreHorizontal } from "lucide-react";
 import { leadsService } from "@/services/leads.service";
 import { dealsService } from "@/services/deals.service";
 import { formatDate, formatRelativeTime, formatCurrency } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CreateLeadModal } from "@/features/leads/CreateLeadModal";
+import { DealFormModal } from "@/features/deals/DealFormModal";
 import { useAuth } from "@/lib/auth-context";
 import type { Lead, Deal } from "@/types";
 
@@ -22,11 +23,30 @@ export function LeadDetail({ id }: { id: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [editDeal, setEditDeal] = useState<Deal | null>(null);
+  const [deleteDeal, setDeleteDeal] = useState<Deal | null>(null);
+  const [deletingDeal, setDeletingDeal] = useState(false);
+  const [dealMenuOpen, setDealMenuOpen] = useState<string | null>(null);
+  const dealMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     leadsService.getById(id).then(setLead).catch(() => setNotFound(true));
     dealsService.getAll().then((all) => setDeals(all.filter((d) => d.lead?.id === id))).catch(() => {});
   }, [id]);
+
+  async function handleDeleteDeal() {
+    if (!deleteDeal) return;
+    setDeletingDeal(true);
+    try {
+      await dealsService.delete(deleteDeal.id);
+      setDeals((prev) => prev.filter((d) => d.id !== deleteDeal.id));
+      setDeleteDeal(null);
+    } catch {
+      // keep modal open
+    } finally {
+      setDeletingDeal(false);
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -212,13 +232,41 @@ export function LeadDetail({ id }: { id: string }) {
                 <div className="space-y-2">
                   {deals.map((d) => (
                     <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 truncate">{d.title}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{d.stage}</p>
                       </div>
-                      <span className="text-sm font-semibold text-gray-700 shrink-0 ml-4">
+                      <span className="text-sm font-semibold text-gray-700 shrink-0 mx-4">
                         {formatCurrency(d.value)}
                       </span>
+                      {isManager && (
+                        <div className="relative shrink-0" ref={dealMenuOpen === d.id ? dealMenuRef : null}>
+                          <button
+                            onClick={() => setDealMenuOpen(dealMenuOpen === d.id ? null : d.id)}
+                            className="p-1 rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                          {dealMenuOpen === d.id && (
+                            <div className="absolute right-0 top-7 z-20 bg-white rounded-xl shadow-lg border border-gray-100 py-1 min-w-[130px]">
+                              <button
+                                onClick={() => { setDealMenuOpen(null); setEditDeal(d); }}
+                                className="flex items-center gap-2 w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => { setDealMenuOpen(null); setDeleteDeal(d); }}
+                                className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -265,13 +313,54 @@ export function LeadDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* Edit modal — reuses CreateLeadModal in edit mode */}
+      {/* Edit lead modal */}
       <CreateLeadModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
         initialLead={lead}
         onCreated={(updated) => setLead(updated)}
       />
+
+      {/* Edit deal modal */}
+      <DealFormModal
+        open={!!editDeal}
+        onClose={() => setEditDeal(null)}
+        deal={editDeal ?? undefined}
+        onSaved={(updated) => {
+          setDeals((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+          setEditDeal(null);
+        }}
+      />
+
+      {/* Delete deal confirmation */}
+      {deleteDeal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setDeleteDeal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-900">Delete Deal</h2>
+            <p className="text-sm text-gray-600">
+              Delete <span className="font-medium text-gray-900">"{deleteDeal.title}"</span>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteDeal(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteDeal}
+                disabled={deletingDeal}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+              >
+                {deletingDeal ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
