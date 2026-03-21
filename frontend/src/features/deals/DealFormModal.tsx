@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Loader2 } from "lucide-react";
 import { dealsService } from "@/services/deals.service";
-import type { Deal, DealStage } from "@/types";
+import { leadsService } from "@/services/leads.service";
+import type { Deal, DealStage, Lead } from "@/types";
 
 const STAGES: { value: DealStage; label: string }[] = [
   { value: "New",         label: "New"         },
@@ -31,9 +32,16 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
   const [stage, setStage] = useState<DealStage>(initialStage ?? "New");
   const [notes, setNotes] = useState("");
   const [closingDate, setClosingDate] = useState("");
+  const [leadId, setLeadId] = useState("");
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
+
+  // Load leads for selector
+  useEffect(() => {
+    leadsService.getAll().then(setLeads).catch(() => {});
+  }, []);
 
   // Populate form when editing
   useEffect(() => {
@@ -44,8 +52,9 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
         setStage(deal.stage);
         setNotes(deal.notes ?? "");
         setClosingDate(deal.closingDate ? deal.closingDate.split("T")[0] : "");
+        setLeadId(deal.lead?.id ?? "");
       } else {
-        setTitle(""); setValue(""); setNotes(""); setClosingDate("");
+        setTitle(""); setValue(""); setNotes(""); setClosingDate(""); setLeadId("");
         setStage(initialStage ?? "New");
       }
       setError("");
@@ -78,6 +87,7 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
           stage,
           notes: notes.trim() || undefined,
           closingDate: closingDate ? closingDate + "T00:00:00Z" : undefined,
+          leadId: leadId || undefined,
         });
       } else {
         saved = await dealsService.create({
@@ -86,6 +96,7 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
           stage,
           notes: notes.trim() || undefined,
           closingDate: closingDate ? closingDate + "T00:00:00Z" : undefined,
+          leadId: leadId || undefined,
         });
       }
       onSaved(saved);
@@ -157,6 +168,23 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Associated Lead */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Associated Lead</label>
+            <select
+              value={leadId}
+              onChange={(e) => setLeadId(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">— No lead —</option>
+              {leads.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}{l.company ? ` · ${l.company}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Closing Date */}
