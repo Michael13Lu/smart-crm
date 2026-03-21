@@ -5,6 +5,9 @@ import { dashboardService } from "@/services/dashboard.service";
 import { formatCurrency } from "@/lib/utils";
 import type { DashboardStats } from "@/types";
 
+// Fixed pipeline order — all 5 stages always shown
+const PIPELINE_ORDER = ["New", "Contacted", "Negotiation", "ClosedWon", "ClosedLost"] as const;
+
 const STAGE_STYLES: Record<string, { color: string; bar: string }> = {
   New:         { color: "text-slate-600",   bar: "bg-slate-400"  },
   Contacted:   { color: "text-blue-600",    bar: "bg-blue-400"   },
@@ -34,14 +37,17 @@ export function PipelineSummary() {
     );
   }
 
-  const maxValue = Math.max(...stats.dealsByStage.map((s) => s.value), 1);
+  // Merge API data with fixed order — stages missing from API get count=0, value=0
+  const stageMap = Object.fromEntries(stats.dealsByStage.map((s) => [s.stage, s]));
+  const ordered = PIPELINE_ORDER.map((key) => stageMap[key] ?? { stage: key, count: 0, value: 0 });
+  const maxValue = Math.max(...ordered.map((s) => s.value), 1);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
       <h2 className="text-sm font-semibold text-gray-900 mb-5">Deal Pipeline</h2>
 
       <div className="space-y-4">
-        {stats.dealsByStage.map((s) => {
+        {ordered.map((s) => {
           const style = STAGE_STYLES[s.stage] ?? { color: "text-gray-600", bar: "bg-gray-400" };
           return (
             <div key={s.stage}>
