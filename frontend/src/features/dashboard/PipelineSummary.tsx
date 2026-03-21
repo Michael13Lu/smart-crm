@@ -41,6 +41,7 @@ export function PipelineSummary() {
   const stageMap = Object.fromEntries(stats.dealsByStage.map((s) => [s.stage, s]));
   const ordered = PIPELINE_ORDER.map((key) => stageMap[key] ?? { stage: key, count: 0, value: 0 });
   const maxValue = Math.max(...ordered.map((s) => s.value), 1);
+  const totalValue = ordered.reduce((sum, s) => sum + s.value, 0);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
@@ -77,7 +78,7 @@ export function PipelineSummary() {
 
       <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between text-sm">
         <span className="text-gray-500">Total pipeline value</span>
-        <span className="font-bold text-gray-900">{formatCurrency(stats.pipelineValue)}</span>
+        <span className="font-bold text-gray-900">{formatCurrency(totalValue)}</span>
       </div>
     </div>
   );
