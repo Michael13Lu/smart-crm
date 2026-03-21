@@ -6,6 +6,8 @@ import { Search, Plus, ExternalLink, Users } from "lucide-react";
 import { leadsService } from "@/services/leads.service";
 import { formatRelativeTime } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { CreateLeadModal } from "@/features/leads/CreateLeadModal";
+import { useAuth } from "@/lib/auth-context";
 import type { Lead, LeadStatus } from "@/types";
 
 const STATUS_FILTERS: { label: string; value: LeadStatus | "all" }[] = [
@@ -17,10 +19,12 @@ const STATUS_FILTERS: { label: string; value: LeadStatus | "all" }[] = [
 ];
 
 export function LeadsTable() {
+  const { isManager } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -64,10 +68,15 @@ export function LeadsTable() {
               className="pl-9 pr-4 py-2 w-full sm:w-64 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          <button className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap">
-            <Plus className="w-4 h-4" />
-            Add Lead
-          </button>
+          {isManager && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              Add Lead
+            </button>
+          )}
         </div>
       </div>
 
@@ -167,6 +176,11 @@ export function LeadsTable() {
           </table>
         </div>
       </div>
+      <CreateLeadModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={(lead) => setLeads((prev) => [lead, ...prev])}
+      />
     </div>
   );
 }
