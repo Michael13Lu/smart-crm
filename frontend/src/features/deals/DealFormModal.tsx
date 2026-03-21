@@ -21,10 +21,12 @@ interface Props {
   deal?: Deal;
   /** Pre-selected stage when creating from a column button */
   initialStage?: DealStage;
+  /** Pre-selected lead when creating from a lead detail page */
+  initialLeadId?: string;
   onSaved: (deal: Deal) => void;
 }
 
-export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Props) {
+export function DealFormModal({ open, onClose, deal, initialStage, initialLeadId, onSaved }: Props) {
   const isEdit = !!deal;
 
   const [title, setTitle] = useState("");
@@ -54,7 +56,8 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
         setClosingDate(deal.closingDate ? deal.closingDate.split("T")[0] : "");
         setLeadId(deal.lead?.id ?? "");
       } else {
-        setTitle(""); setValue(""); setNotes(""); setClosingDate(""); setLeadId("");
+        setTitle(""); setValue(""); setNotes(""); setClosingDate("");
+        setLeadId(initialLeadId ?? "");
         setStage(initialStage ?? "New");
       }
       setError("");

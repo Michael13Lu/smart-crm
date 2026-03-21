@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, Phone, Building2, Globe, Pencil, Trash2, Loader2, TrendingUp, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Building2, Globe, Pencil, Trash2, Loader2, TrendingUp, MoreHorizontal, Plus } from "lucide-react";
 import { leadsService } from "@/services/leads.service";
 import { dealsService } from "@/services/deals.service";
 import { formatDate, formatRelativeTime, formatCurrency } from "@/lib/utils";
@@ -27,6 +27,7 @@ export function LeadDetail({ id }: { id: string }) {
   const [deleteDeal, setDeleteDeal] = useState<Deal | null>(null);
   const [deletingDeal, setDeletingDeal] = useState(false);
   const [dealMenuOpen, setDealMenuOpen] = useState<string | null>(null);
+  const [addDealOpen, setAddDealOpen] = useState(false);
   const dealMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -221,9 +222,18 @@ export function LeadDetail({ id }: { id: string }) {
                 <TrendingUp className="w-4 h-4 text-indigo-500" />
                 <h2 className="text-sm font-semibold text-gray-900">Pipeline Deals</h2>
                 {deals.length > 0 && (
-                  <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                     {deals.length}
                   </span>
+                )}
+                {isManager && (
+                  <button
+                    onClick={() => setAddDealOpen(true)}
+                    className="ml-auto p-1 rounded-lg text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    title="Add deal"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 )}
               </div>
               {deals.length === 0 ? (
@@ -319,6 +329,17 @@ export function LeadDetail({ id }: { id: string }) {
         onClose={() => setEditOpen(false)}
         initialLead={lead}
         onCreated={(updated) => setLead(updated)}
+      />
+
+      {/* Add deal modal — lead pre-selected */}
+      <DealFormModal
+        open={addDealOpen}
+        onClose={() => setAddDealOpen(false)}
+        initialLeadId={id}
+        onSaved={(created) => {
+          setDeals((prev) => [...prev, created]);
+          setAddDealOpen(false);
+        }}
       />
 
       {/* Edit deal modal */}
