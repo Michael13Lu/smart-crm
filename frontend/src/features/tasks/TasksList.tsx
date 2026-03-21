@@ -16,7 +16,7 @@ const STATUS_TABS: { label: string; value: TaskStatus | "all" }[] = [
   { label: "Done",        value: "Done"      },
 ];
 
-function TaskRow({ task, onComplete }: { task: Task; onComplete: (id: string) => void }) {
+function TaskRow({ task, onToggle }: { task: Task; onToggle: (id: string, isDone: boolean) => void }) {
   const isDone = task.status === "Done";
   const isOverdue = task.dueDate && !isDone && new Date(task.dueDate) < new Date();
   const assignedInitials = task.assignedTo?.fullName
@@ -29,9 +29,12 @@ function TaskRow({ task, onComplete }: { task: Task; onComplete: (id: string) =>
       }`}
     >
       <button
-        onClick={() => !isDone && onComplete(task.id)}
+        onClick={() => onToggle(task.id, isDone)}
+        title={isDone ? "Reopen task" : "Mark as done"}
         className={`mt-0.5 shrink-0 transition-colors ${
-          isDone ? "text-emerald-500" : "text-gray-300 hover:text-indigo-500"
+          isDone
+            ? "text-emerald-500 hover:text-gray-400"
+            : "text-gray-300 hover:text-indigo-500"
         }`}
       >
         {isDone ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
@@ -93,12 +96,18 @@ export function TasksList() {
       .finally(() => setLoading(false));
   }, [filter]);
 
-  async function handleComplete(id: string) {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Done" as TaskStatus } : t)));
+  async function handleToggle(id: string, isDone: boolean) {
+    const nextStatus: TaskStatus = isDone ? "Pending" : "Done";
+    const prevStatus: TaskStatus = isDone ? "Done" : "Pending";
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
     try {
-      await tasksService.complete(id);
+      if (isDone) {
+        await tasksService.update(id, { status: "Pending" });
+      } else {
+        await tasksService.complete(id);
+      }
     } catch {
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Pending" as TaskStatus } : t)));
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: prevStatus } : t)));
     }
   }
 
@@ -155,7 +164,7 @@ export function TasksList() {
               <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />
             ))
           : filtered.map((task) => (
-              <TaskRow key={task.id} task={task} onComplete={handleComplete} />
+              <TaskRow key={task.id} task={task} onToggle={handleToggle} />
             ))}
         {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
