@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CheckCircle2, Circle, Plus, Calendar, ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { CheckCircle2, Circle, Plus, Calendar, ClipboardList, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { tasksService } from "@/services/tasks.service";
 import { formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -21,17 +21,29 @@ interface TaskRowProps {
   onToggle: (id: string, isDone: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
+  isManager: boolean;
 }
 
-function TaskRow({ task, onToggle, onEdit, onDelete }: TaskRowProps) {
+function TaskRow({ task, onToggle, onEdit, onDelete, isManager }: TaskRowProps) {
   const isDone = task.status === "Done";
   const isOverdue = task.dueDate && !isDone && new Date(task.dueDate) < new Date();
   const assignedInitials = task.assignedTo?.fullName
     .split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [menuOpen]);
 
   return (
     <div
-      className={`group flex items-start gap-4 p-4 rounded-xl border transition-colors ${
+      className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${
         isDone ? "bg-gray-50 border-gray-100" : "bg-white border-gray-100 hover:border-indigo-200"
       }`}
     >
@@ -52,22 +64,36 @@ function TaskRow({ task, onToggle, onEdit, onDelete }: TaskRowProps) {
           <p className={`text-sm font-medium leading-snug ${isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
             {task.title}
           </p>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <StatusBadge type="priority" status={task.priority} />
-            <button
-              onClick={() => onEdit(task)}
-              title="Edit task"
-              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => onDelete(task)}
-              title="Delete task"
-              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {isManager && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-7 z-20 bg-white rounded-xl shadow-lg border border-gray-100 py-1 min-w-[130px]">
+                    <button
+                      onClick={() => { setMenuOpen(false); onEdit(task); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); onDelete(task); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -210,6 +236,7 @@ export function TasksList() {
                 onToggle={handleToggle}
                 onEdit={setEditTask}
                 onDelete={setDeleteTask}
+                isManager={isManager}
               />
             ))}
         {!loading && filtered.length === 0 && (
