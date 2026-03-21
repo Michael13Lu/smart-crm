@@ -51,7 +51,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
-        dueDate: dueDate || undefined,
+        dueDate: dueDate ? dueDate + "T00:00:00Z" : undefined,
       });
       onCreated(task);
       onClose();

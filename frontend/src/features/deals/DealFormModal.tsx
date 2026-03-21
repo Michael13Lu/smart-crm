@@ -77,7 +77,7 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
           value: numValue,
           stage,
           notes: notes.trim() || undefined,
-          closingDate: closingDate || undefined,
+          closingDate: closingDate ? closingDate + "T00:00:00Z" : undefined,
         });
       } else {
         saved = await dealsService.create({
@@ -85,7 +85,7 @@ export function DealFormModal({ open, onClose, deal, initialStage, onSaved }: Pr
           value: numValue,
           stage,
           notes: notes.trim() || undefined,
-          closingDate: closingDate || undefined,
+          closingDate: closingDate ? closingDate + "T00:00:00Z" : undefined,
         });
       }
       onSaved(saved);
