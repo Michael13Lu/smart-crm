@@ -27,7 +27,13 @@ builder.Services.AddIdentityWithRoles();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddRepositories();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Accept and return enums as strings (e.g. "New", "ClosedWon")
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddOpenApi();
 
 // ── CORS: allow frontend origin ───────────────────────────────
@@ -38,7 +44,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 frontendOrigin,
                 "http://localhost:3000",
-                "https://localhost:3000")
+                "https://localhost:3000",
+                "https://frontend-peach-mu-96.vercel.app")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
