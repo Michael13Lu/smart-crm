@@ -3,18 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, Phone, Building2, Globe, Pencil, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Building2, Globe, Pencil, Trash2, Loader2, TrendingUp } from "lucide-react";
 import { leadsService } from "@/services/leads.service";
-import { formatDate, formatRelativeTime } from "@/lib/utils";
+import { dealsService } from "@/services/deals.service";
+import { formatDate, formatRelativeTime, formatCurrency } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CreateLeadModal } from "@/features/leads/CreateLeadModal";
 import { useAuth } from "@/lib/auth-context";
-import type { Lead } from "@/types";
+import type { Lead, Deal } from "@/types";
 
 export function LeadDetail({ id }: { id: string }) {
   const router = useRouter();
   const { isManager, isAdmin } = useAuth();
   const [lead, setLead] = useState<Lead | null>(null);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -23,6 +25,7 @@ export function LeadDetail({ id }: { id: string }) {
 
   useEffect(() => {
     leadsService.getById(id).then(setLead).catch(() => setNotFound(true));
+    dealsService.getAll().then((all) => setDeals(all.filter((d) => d.lead?.id === id))).catch(() => {});
   }, [id]);
 
   async function handleDelete() {
@@ -191,6 +194,36 @@ export function LeadDetail({ id }: { id: string }) {
                 <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{lead.notes}</p>
               </div>
             )}
+
+            {/* Deals linked to this lead */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-4 h-4 text-indigo-500" />
+                <h2 className="text-sm font-semibold text-gray-900">Pipeline Deals</h2>
+                {deals.length > 0 && (
+                  <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {deals.length}
+                  </span>
+                )}
+              </div>
+              {deals.length === 0 ? (
+                <p className="text-sm text-gray-400">No deals linked to this lead yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {deals.map((d) => (
+                    <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{d.title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{d.stage}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-700 shrink-0 ml-4">
+                        {formatCurrency(d.value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">
