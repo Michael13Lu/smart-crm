@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, Circle, Plus, Calendar, ClipboardList } from "lucide-react";
+import { CheckCircle2, Circle, Plus, Calendar, ClipboardList, Pencil, Trash2 } from "lucide-react";
 import { tasksService } from "@/services/tasks.service";
 import { formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -16,7 +16,14 @@ const STATUS_TABS: { label: string; value: TaskStatus | "all" }[] = [
   { label: "Done",        value: "Done"      },
 ];
 
-function TaskRow({ task, onToggle }: { task: Task; onToggle: (id: string, isDone: boolean) => void }) {
+interface TaskRowProps {
+  task: Task;
+  onToggle: (id: string, isDone: boolean) => void;
+  onEdit: (task: Task) => void;
+  onDelete: (task: Task) => void;
+}
+
+function TaskRow({ task, onToggle, onEdit, onDelete }: TaskRowProps) {
   const isDone = task.status === "Done";
   const isOverdue = task.dueDate && !isDone && new Date(task.dueDate) < new Date();
   const assignedInitials = task.assignedTo?.fullName
@@ -24,7 +31,7 @@ function TaskRow({ task, onToggle }: { task: Task; onToggle: (id: string, isDone
 
   return (
     <div
-      className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${
+      className={`group flex items-start gap-4 p-4 rounded-xl border transition-colors ${
         isDone ? "bg-gray-50 border-gray-100" : "bg-white border-gray-100 hover:border-indigo-200"
       }`}
     >
@@ -45,7 +52,23 @@ function TaskRow({ task, onToggle }: { task: Task; onToggle: (id: string, isDone
           <p className={`text-sm font-medium leading-snug ${isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
             {task.title}
           </p>
-          <StatusBadge type="priority" status={task.priority} />
+          <div className="flex items-center gap-1 shrink-0">
+            <StatusBadge type="priority" status={task.priority} />
+            <button
+              onClick={() => onEdit(task)}
+              title="Edit task"
+              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(task)}
+              title="Delete task"
+              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {task.description && !isDone && (
@@ -86,6 +109,9 @@ export function TasksList() {
   const [filter, setFilter] = useState<TaskStatus | "all">("all");
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [deleteTask, setDeleteTask] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -108,6 +134,20 @@ export function TasksList() {
       }
     } catch {
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: prevStatus } : t)));
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTask) return;
+    setDeleting(true);
+    try {
+      await tasksService.delete(deleteTask.id);
+      setTasks((prev) => prev.filter((t) => t.id !== deleteTask.id));
+      setDeleteTask(null);
+    } catch {
+      // keep modal open on error
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -164,7 +204,13 @@ export function TasksList() {
               <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />
             ))
           : filtered.map((task) => (
-              <TaskRow key={task.id} task={task} onToggle={handleToggle} />
+              <TaskRow
+                key={task.id}
+                task={task}
+                onToggle={handleToggle}
+                onEdit={setEditTask}
+                onDelete={setDeleteTask}
+              />
             ))}
         {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -179,11 +225,53 @@ export function TasksList() {
         )}
       </div>
 
+      {/* Create modal */}
       <CreateTaskModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={(task) => setTasks((prev) => [task, ...prev])}
       />
+
+      {/* Edit modal */}
+      <CreateTaskModal
+        open={!!editTask}
+        onClose={() => setEditTask(null)}
+        editTask={editTask}
+        onCreated={() => {}}
+        onUpdated={(updated) =>
+          setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+        }
+      />
+
+      {/* Delete confirmation */}
+      {deleteTask && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setDeleteTask(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-900">Delete Task</h2>
+            <p className="text-sm text-gray-600">
+              Are you sure you want to delete <span className="font-medium text-gray-900">"{deleteTask.title}"</span>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTask(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

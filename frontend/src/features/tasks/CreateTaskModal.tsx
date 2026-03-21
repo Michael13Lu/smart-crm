@@ -9,15 +9,17 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (task: Task) => void;
+  onUpdated?: (task: Task) => void;
+  editTask?: Task | null;
 }
 
-const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
-  { value: "Low",    label: "Low",    color: "border-gray-200 text-gray-600 peer-checked:border-gray-400 peer-checked:bg-gray-50" },
-  { value: "Medium", label: "Medium", color: "border-gray-200 text-amber-600 peer-checked:border-amber-400 peer-checked:bg-amber-50" },
-  { value: "High",   label: "High",   color: "border-gray-200 text-red-600 peer-checked:border-red-400 peer-checked:bg-red-50" },
+const PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: "Low",    label: "Low"    },
+  { value: "Medium", label: "Medium" },
+  { value: "High",   label: "High"   },
 ];
 
-export function CreateTaskModal({ open, onClose, onCreated }: Props) {
+export function CreateTaskModal({ open, onClose, onCreated, onUpdated, editTask }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("Medium");
@@ -26,14 +28,22 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
   const [error, setError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
 
+  const isEdit = !!editTask;
+
   useEffect(() => {
     if (open) {
+      if (editTask) {
+        setTitle(editTask.title);
+        setDescription(editTask.description ?? "");
+        setPriority(editTask.priority);
+        setDueDate(editTask.dueDate ? editTask.dueDate.split("T")[0] : "");
+      } else {
+        setTitle(""); setDescription(""); setPriority("Medium"); setDueDate("");
+      }
+      setError("");
       setTimeout(() => titleRef.current?.focus(), 50);
-    } else {
-      setTitle(""); setDescription(""); setPriority("Medium");
-      setDueDate(""); setError("");
     }
-  }, [open]);
+  }, [open, editTask]);
 
   useEffect(() => {
     if (!open) return;
@@ -47,16 +57,22 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
     setError("");
     setLoading(true);
     try {
-      const task = await tasksService.create({
+      const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
         dueDate: dueDate ? dueDate + "T00:00:00Z" : undefined,
-      });
-      onCreated(task);
+      };
+      if (isEdit && editTask) {
+        const task = await tasksService.update(editTask.id, payload);
+        onUpdated?.(task);
+      } else {
+        const task = await tasksService.create(payload);
+        onCreated(task);
+      }
       onClose();
     } catch {
-      setError("Failed to create task. Please try again.");
+      setError(isEdit ? "Failed to update task." : "Failed to create task.");
     } finally {
       setLoading(false);
     }
@@ -71,14 +87,13 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">New Task</h2>
+          <h2 className="text-sm font-semibold text-gray-900">{isEdit ? "Edit Task" : "New Task"}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {/* Title */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">
               Task Title <span className="text-red-500">*</span>
@@ -93,7 +108,6 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
             />
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Description</label>
             <textarea
@@ -105,7 +119,6 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
             />
           </div>
 
-          {/* Priority */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">Priority</label>
             <div className="flex gap-2">
@@ -134,14 +147,12 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
             </div>
           </div>
 
-          {/* Due Date */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Due Date</label>
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
               className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -156,7 +167,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: Props) {
             </button>
             <button type="submit" disabled={loading} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {loading ? "Creating…" : "Create Task"}
+              {loading ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save Changes" : "Create Task")}
             </button>
           </div>
         </form>
