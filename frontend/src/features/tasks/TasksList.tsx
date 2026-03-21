@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { CheckCircle2, Circle, Plus, Calendar, ClipboardList, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Plus, Calendar, ClipboardList, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { tasksService } from "@/services/tasks.service";
 import { formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -16,15 +16,33 @@ const STATUS_TABS: { label: string; value: TaskStatus | "all" }[] = [
   { label: "Done",        value: "Done"      },
 ];
 
+const STATUS_CYCLE: readonly TaskStatus[] = ["Pending", "InProgress", "Done"];
+
+const STATUS_ICON: Record<TaskStatus, React.ReactNode> = {
+  Pending:    <Circle className="w-5 h-5" />,
+  InProgress: <Clock className="w-5 h-5" />,
+  Done:       <CheckCircle2 className="w-5 h-5" />,
+};
+const STATUS_COLOR: Record<TaskStatus, string> = {
+  Pending:    "text-gray-300 hover:text-indigo-500",
+  InProgress: "text-amber-400 hover:text-amber-500",
+  Done:       "text-emerald-500 hover:text-gray-400",
+};
+const STATUS_TITLE: Record<TaskStatus, string> = {
+  Pending:    "Mark as In Progress",
+  InProgress: "Mark as Done",
+  Done:       "Reopen task",
+};
+
 interface TaskRowProps {
   task: Task;
-  onToggle: (id: string, isDone: boolean) => void;
+  onCycle: (id: string, current: TaskStatus) => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   isManager: boolean;
 }
 
-function TaskRow({ task, onToggle, onEdit, onDelete, isManager }: TaskRowProps) {
+function TaskRow({ task, onCycle, onEdit, onDelete, isManager }: TaskRowProps) {
   const isDone = task.status === "Done";
   const isOverdue = task.dueDate && !isDone && new Date(task.dueDate) < new Date();
   const assignedInitials = task.assignedTo?.fullName
@@ -48,15 +66,11 @@ function TaskRow({ task, onToggle, onEdit, onDelete, isManager }: TaskRowProps) 
       }`}
     >
       <button
-        onClick={() => onToggle(task.id, isDone)}
-        title={isDone ? "Reopen task" : "Mark as done"}
-        className={`mt-0.5 shrink-0 transition-colors ${
-          isDone
-            ? "text-emerald-500 hover:text-gray-400"
-            : "text-gray-300 hover:text-indigo-500"
-        }`}
+        onClick={() => onCycle(task.id, task.status)}
+        title={STATUS_TITLE[task.status]}
+        className={`mt-0.5 shrink-0 transition-colors ${STATUS_COLOR[task.status]}`}
       >
-        {isDone ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+        {STATUS_ICON[task.status]}
       </button>
 
       <div className="flex-1 min-w-0">
@@ -148,18 +162,18 @@ export function TasksList() {
       .finally(() => setLoading(false));
   }, [filter]);
 
-  async function handleToggle(id: string, isDone: boolean) {
-    const nextStatus: TaskStatus = isDone ? "Pending" : "Done";
-    const prevStatus: TaskStatus = isDone ? "Done" : "Pending";
+  async function handleCycle(id: string, current: TaskStatus) {
+    const idx = STATUS_CYCLE.indexOf(current);
+    const nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
     try {
-      if (isDone) {
-        await tasksService.update(id, { status: "Pending" });
-      } else {
+      if (nextStatus === "Done") {
         await tasksService.complete(id);
+      } else {
+        await tasksService.update(id, { status: nextStatus });
       }
     } catch {
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: prevStatus } : t)));
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: current } : t)));
     }
   }
 
@@ -233,7 +247,7 @@ export function TasksList() {
               <TaskRow
                 key={task.id}
                 task={task}
-                onToggle={handleToggle}
+                onCycle={handleCycle}
                 onEdit={setEditTask}
                 onDelete={setDeleteTask}
                 isManager={isManager}
