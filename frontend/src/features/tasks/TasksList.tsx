@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, Circle, Plus, Calendar } from "lucide-react";
+import { CheckCircle2, Circle, Plus, Calendar, ClipboardList } from "lucide-react";
 import { tasksService } from "@/services/tasks.service";
 import { formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { CreateTaskModal } from "@/features/tasks/CreateTaskModal";
+import { useAuth } from "@/lib/auth-context";
 import type { Task, TaskStatus } from "@/types";
 
 const STATUS_TABS: { label: string; value: TaskStatus | "all" }[] = [
@@ -76,9 +78,11 @@ function TaskRow({ task, onComplete }: { task: Task; onComplete: (id: string) =>
 }
 
 export function TasksList() {
+  const { isManager } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<TaskStatus | "all">("all");
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -134,10 +138,15 @@ export function TasksList() {
           ))}
         </div>
 
-        <button className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-          <Plus className="w-4 h-4" />
-          Add Task
-        </button>
+        {isManager && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Task
+          </button>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -149,9 +158,23 @@ export function TasksList() {
               <TaskRow key={task.id} task={task} onComplete={handleComplete} />
             ))}
         {!loading && filtered.length === 0 && (
-          <div className="text-center py-12 text-sm text-gray-400">No tasks here.</div>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+              <ClipboardList className="w-5 h-5 text-gray-400" />
+            </div>
+            <p className="text-sm font-medium text-gray-700">No tasks found</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {filter !== "all" ? "Try a different filter." : "Add your first task to stay on track."}
+            </p>
+          </div>
         )}
       </div>
+
+      <CreateTaskModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={(task) => setTasks((prev) => [task, ...prev])}
+      />
     </div>
   );
 }

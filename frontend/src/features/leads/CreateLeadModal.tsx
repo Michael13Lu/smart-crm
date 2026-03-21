@@ -8,12 +8,16 @@ import type { Lead } from "@/types";
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** If provided, modal is in edit mode */
+  initialLead?: Lead;
   onCreated: (lead: Lead) => void;
 }
 
 const SOURCES = ["Website", "LinkedIn", "Referral", "Cold Outreach", "Event", "Other"];
 
-export function CreateLeadModal({ open, onClose, onCreated }: Props) {
+export function CreateLeadModal({ open, onClose, initialLead, onCreated }: Props) {
+  const isEdit = !!initialLead;
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -24,18 +28,24 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
   const [error, setError] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
 
-  // Focus first field when modal opens; reset state when closed
   useEffect(() => {
     if (open) {
-      setTimeout(() => nameRef.current?.focus(), 50);
-    } else {
-      setName(""); setEmail(""); setPhone("");
-      setCompany(""); setSource(""); setNotes("");
+      if (initialLead) {
+        setName(initialLead.name);
+        setEmail(initialLead.email);
+        setPhone(initialLead.phone ?? "");
+        setCompany(initialLead.company ?? "");
+        setSource(initialLead.source ?? "");
+        setNotes(initialLead.notes ?? "");
+      } else {
+        setName(""); setEmail(""); setPhone("");
+        setCompany(""); setSource(""); setNotes("");
+      }
       setError("");
+      setTimeout(() => nameRef.current?.focus(), 50);
     }
-  }, [open]);
+  }, [open, initialLead]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -50,18 +60,24 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
     setError("");
     setLoading(true);
     try {
-      const lead = await leadsService.create({
+      let lead: Lead;
+      const payload = {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
         company: company.trim() || undefined,
         source: source || undefined,
         notes: notes.trim() || undefined,
-      });
+      };
+      if (isEdit && initialLead) {
+        lead = await leadsService.update(initialLead.id, payload);
+      } else {
+        lead = await leadsService.create(payload);
+      }
       onCreated(lead);
       onClose();
     } catch {
-      setError("Failed to create lead. Please try again.");
+      setError(`Failed to ${isEdit ? "update" : "create"} lead. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -70,7 +86,6 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
   if (!open) return null;
 
   return (
-    // Backdrop
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -78,7 +93,7 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">New Lead</h2>
+          <h2 className="text-sm font-semibold text-gray-900">{isEdit ? "Edit Lead" : "New Lead"}</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
@@ -89,7 +104,6 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {/* Name + Email */}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-xs font-medium text-gray-700 mb-1.5">
@@ -119,7 +133,6 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
             </div>
           </div>
 
-          {/* Company + Phone */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1.5">Company</label>
@@ -142,7 +155,6 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
             </div>
           </div>
 
-          {/* Source */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Source</label>
             <select
@@ -157,7 +169,6 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
             </select>
           </div>
 
-          {/* Notes */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>
             <textarea
@@ -169,14 +180,12 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
             />
           </div>
 
-          {/* Error */}
           {error && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
               {error}
             </p>
           )}
 
-          {/* Actions */}
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
@@ -191,7 +200,9 @@ export function CreateLeadModal({ open, onClose, onCreated }: Props) {
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {loading ? "Creating…" : "Create Lead"}
+              {loading
+                ? (isEdit ? "Saving…" : "Creating…")
+                : (isEdit ? "Save Changes" : "Create Lead")}
             </button>
           </div>
         </form>
